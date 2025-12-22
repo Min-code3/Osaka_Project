@@ -22,7 +22,7 @@ st.set_page_config(page_title="Osaka Travel Guide", layout="wide")
 def load_data():
     try:
         # 보내주신 헤더에 맞춰 데이터 읽기
-        df = pd.read_excel("오사카 데이터.xlsx")
+        df = pd.read_excel("data.xlsx")
     except:
         return None
     
