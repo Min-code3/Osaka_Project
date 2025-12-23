@@ -59,7 +59,7 @@ if language == "🇰🇷 한국어":
     col_area = 'Area_KR'
     col_hub  = 'Hub_KR'
     col_cat  = 'Category_KR'
-    col_grp  = 'Group_KR'
+    col_tag  = 'Tag_KR'       # [수정 0] 한국어 태그 컬럼
     col_map  = 'Google_Map_KR'
     col_img  = 'Google_Image_KR'
     
