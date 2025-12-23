@@ -89,6 +89,7 @@ else: # English
     col_hub  = 'Hub_EN'
     col_cat  = 'Category_EN'
     col_grp  = 'Group_EN'
+    col_tag  = 'Tag_EN'       # [수정 0] 영어 태그 컬럼
     col_map  = 'Google_Map_EN'
     col_img  = 'Google_Image_EN'
     
