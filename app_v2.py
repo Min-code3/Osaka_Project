@@ -6,27 +6,36 @@ import base64
 # ---------------------------------------------------------
 # [신규 기능 함수] 클릭 가능한 로컬 이미지 HTML 생성
 # ---------------------------------------------------------
-def get_clickable_image_html(img_path, target_url, width="100%"):
+# ---------------------------------------------------------
+# [수정된 함수] 높이 고정 및 CSS Crop 적용
+# ---------------------------------------------------------
+def get_clickable_image_html(img_path, target_url=None, height="220px"):
     """
-    로컬 이미지를 읽어서 base64로 인코딩한 뒤, 
-    지정된 URL로 연결되는 HTML <a> 태그로 감싸서 반환합니다.
+    이미지를 읽어 고정된 높이(height)로 크롭하여 HTML을 반환합니다.
+    target_url이 있으면 링크를 걸고, 없으면 이미지만 보여줍니다.
     """
     if os.path.exists(img_path):
         with open(img_path, "rb") as f:
             data = f.read()
             encoded = base64.b64encode(data).decode()
         
-        # 이미지에 마우스를 올렸을 때 살짝 커지는 효과 추가 (CSS)
-        html_code = f'''
-            <a href="{target_url}" target="_blank" style="text-decoration: none;">
-                <img src="data:image/jpeg;base64,{encoded}" 
-                     style="width:{width}; border-radius:12px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s ease;"
-                     onmouseover="this.style.transform='scale(1.02)'"
-                     onmouseout="this.style.transform='scale(1.0)'"
-                >
-            </a>
+        # [핵심 CSS] object-fit: cover -> 이미지를 찌그러뜨리지 않고 꽉 채움
+        img_style = f'''
+            width: 100%; 
+            height: {height}; 
+            object-fit: cover; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
         '''
-        return html_code
+        
+        img_tag = f'<img src="data:image/jpeg;base64,{encoded}" style="{img_style}" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1.0)\'">'
+        
+        # target_url이 있고(None이 아니고), http로 시작할 때만 링크 생성
+        if target_url and str(target_url).startswith('http'):
+            return f'<a href="{target_url}" target="_blank" style="text-decoration: none;">{img_tag}</a>'
+        else:
+            return img_tag # 링크가 없으면 이미지만 반환
     else:
         return None
 
@@ -265,20 +274,21 @@ with st.sidebar:
 
 # ---------------------------------------------------------
 # ---------------------------------------------------------
-# 6. 결과 출력 (수정됨)
+# ---------------------------------------------------------
+# 6. 결과 출력 (태그 숨김 버전)
 # ---------------------------------------------------------
 st.markdown(f"{ui_msg_result} **{len(filtered_df)}**")
 
 if len(filtered_df) == 0:
     st.warning(ui_msg_no_result)
 else:
-    # 1. 보기 모드에 따라 열 개수 결정
+    # 1. 보기 모드 설정
     if "Gallery" in view_mode:
-        num_columns = 3  # PC용 3열
+        num_columns = 3
     else:
-        num_columns = 1  # 모바일용 1열 (리스트)
+        num_columns = 1
 
-    # 2. 그리드 배치 로직
+    # 2. 그리드 배치
     rows = [filtered_df.iloc[i:i + num_columns] for i in range(0, len(filtered_df), num_columns)]
 
     for row_data in rows:
@@ -286,29 +296,27 @@ else:
         
         for col, (index, row) in zip(cols, row_data.iterrows()):
             with col:
-                # --- [A] 이미지 (클릭 시 구글 이미지 이동) ---
+                # --- [A] 이미지 ---
                 img_path = os.path.join("images", f"{row['Name_EN']}.jpg")
                 target_link = str(row.get(col_img, '')).strip()
                 
-                # 이미지 표시
-                if target_link.startswith('http'):
-                    html_img = get_clickable_image_html(img_path, target_link)
-                    if html_img:
-                        st.markdown(html_img, unsafe_allow_html=True)
-                    else:
-                        st.warning(f"⚠️ {ui_img_missing}")
+                # 높이 통일 적용 (PC: 200px, Mobile: 250px)
+                img_height = "200px" if num_columns > 1 else "250px"
+                
+                html_code = get_clickable_image_html(img_path, target_link, height=img_height)
+                
+                if html_code:
+                    st.markdown(html_code, unsafe_allow_html=True)
                 else:
-                    if os.path.exists(img_path):
-                        st.image(img_path, use_container_width=True)
+                    st.warning(f"⚠️ {ui_img_missing}")
+                    st.markdown(f'<div style="height:{img_height}; bg-color:#eee;"></div>', unsafe_allow_html=True)
 
-                # --- [B] 핵심 정보 (이름 + 시간 + 지역) ---
-                # 이름은 굵게, 나머지는 작고 회색으로 표시 (수정사항 1 반영)
-                # "from X" 없이 시간과 지역만 깔끔하게 표시
+                # --- [B] 핵심 정보 (이름, 시간, 지역) ---
                 info_text = f"⏱️ {row['Total_Time']} min | 📍 {row[col_area]}"
                 
                 st.markdown(
                     f"""
-                    <div style="margin-top: 5px; line-height: 1.2;">
+                    <div style="margin-top: 5px; margin-bottom: 10px; line-height: 1.2;">
                         <span style="font-size: 1.1em; font-weight: bold;">{row[col_name]}</span><br>
                         <span style="font-size: 0.85em; color: gray;">{info_text}</span>
                     </div>
@@ -316,52 +324,42 @@ else:
                     unsafe_allow_html=True
                 )
 
-                # --- [C] 태그 버튼 (클릭 시 필터링) ---
-                # (수정사항 2 반영: 클릭 시 선택/해제 토글)
-                tags = [t.strip() for t in str(row[col_tag]).split('#') if t.strip()]
-                
-                if tags:
-                    st.write("") # 약간의 여백
-                    # 태그 버튼들을 가로로 꽉 차게 배치하기 위해 columns 사용
-                    # 공간 효율을 위해 최대 3~4개까지만 한 줄에, 넘으면 다음 줄 (Streamlit 버튼 특성상 나열이 쉽지 않아 wrap 방식 사용)
-                    
-                    # 태그를 감싸는 컨테이너
-                    tag_cols = st.columns(len(tags) if len(tags) < 5 else 5)
-                    
-                    for i, tag in enumerate(tags):
-                        # 너무 많으면 5개까지만 표시 (UI 깨짐 방지)하고 break 할 수도 있음. 
-                        # 여기서는 row index를 활용해 줄바꿈 효과를 흉내냄
-                        current_col = tag_cols[i % 5] 
-                        
-                        # 현재 선택된 태그인지 확인
-                        is_selected = tag in st.session_state.selected_tags
-                        
-                        # 버튼 라벨 (선택되면 체크표시)
-                        label = f"✅{tag}" if is_selected else f"#{tag}"
-                        
-                        # 버튼 생성 (Key를 유니크하게 만들어야 함: row인덱스 + 태그명)
-                        # help="클릭하여 필터에 추가/제거"
-                        current_col.button(
-                            label, 
-                            key=f"btn_{index}_{tag}", 
-                            on_click=toggle_tag, 
-                            args=(tag,),
-                            use_container_width=True 
-                        )
-
-                # --- [D] 상세정보 (Expander) ---
+                # --- [C] 상세정보 (Expander) ---
+                # 태그 기능을 이 안으로 옮겼습니다!
                 with st.expander(ui_expander_label):
+                    # 1. 설명 텍스트
                     st.write(row[col_desc])
-                    
-                    # 지도 버튼 (Expander 안으로 이동)
                     st.divider()
+                    
+                    # 2. [이동됨] 태그 버튼 섹션
+                    tags = [t.strip() for t in str(row[col_tag]).split('#') if t.strip()]
+                    
+                    if tags:
+                        st.caption("🏷️ Tags (Click to filter)") # 안내 문구 추가
+                        # 태그 버튼 생성
+                        tag_cols = st.columns(len(tags) if len(tags) < 5 else 5)
+                        for i, tag in enumerate(tags):
+                            current_col = tag_cols[i % 5] 
+                            is_selected = tag in st.session_state.selected_tags
+                            label = f"✅{tag}" if is_selected else f"#{tag}"
+                            
+                            # 기능은 그대로 유지 (toggle_tag 호출)
+                            current_col.button(
+                                label, 
+                                key=f"btn_{index}_{tag}", 
+                                on_click=toggle_tag, 
+                                args=(tag,),
+                                use_container_width=True 
+                            )
+                        st.divider()
+
+                    # 3. 지도 버튼
                     map_link = str(row.get(col_map, '')).strip()
                     if map_link.startswith('http'):
                         st.link_button(ui_btn_map, map_link, use_container_width=True)
                     else:
                         st.button(ui_btn_map, disabled=True, key=f"map_dis_{index}", use_container_width=True)
                 
-                # 카드 간 간격
                 st.write("---")
-                
+
                     #streamlit run app_v2.py
