@@ -296,3 +296,49 @@ else:
                         st.button(ui_btn_map, disabled=True, key=f"map_dis_{index}", use_container_width=True)
                 
                 st.write("---")
+
+# ---------------------------------------------------------
+# [관리자 기능] URL로 숨겨진 관리자 모드 (Backdoor)
+# 이 코드를 app.py의 맨 마지막에 붙여넣으세요.
+# ---------------------------------------------------------
+
+# 1. 주소창에 '?admin=true'가 있는지 몰래 확인
+# (예: https://your-app-url.streamlit.app/?admin=true)
+query_params = st.query_params
+
+if "admin" in query_params and query_params["admin"] == "true":
+    
+    st.divider()
+    st.markdown("### 🕵️‍♂️ 관리자 모드 감지됨 (Admin Mode Detected)")
+    st.info("이 메뉴는 일반 사용자에게는 보이지 않습니다.")
+    
+    # 2. 관리자 비밀번호 설정 (원하는 걸로 바꾸세요!)
+    ADMIN_PASSWORD = "1234" 
+    
+    # 3. 비밀번호 입력창
+    input_pw = st.text_input("관리자 암호를 입력하세요 (Password)", type="password")
+    
+    if input_pw == ADMIN_PASSWORD:
+        st.success("로그인 성공! 데이터를 불러옵니다.")
+        
+        # 파일이 실제로 있는지 확인
+        if os.path.exists("user_logs.csv"):
+            # 로그 파일 읽기
+            log_df = pd.read_csv("user_logs.csv")
+            
+            # 최신순(시간 역순)으로 정렬해서 보여주기
+            st.dataframe(log_df.sort_values("Time", ascending=False), use_container_width=True)
+            
+            # 다운로드 버튼 생성
+            csv_data = log_df.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="💾 로그 데이터 다운로드 (Download CSV)",
+                data=csv_data,
+                file_name="user_logs.csv",
+                mime="text/csv",
+            )
+        else:
+            st.warning("아직 수집된 로그 데이터가 없습니다. (No logs yet)")
+            
+    elif input_pw:
+        st.error("비밀번호가 틀렸습니다! (Wrong Password)")
