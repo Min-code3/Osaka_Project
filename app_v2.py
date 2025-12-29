@@ -306,11 +306,12 @@ else:
 # (예: https://your-app-url.streamlit.app/?admin=true)
 query_params = st.query_params
 
-if "admin" in query_params and query_params["admin"] == "true":
-    
+# 👇 기존의 if문 대신 이걸 써보세요 (무조건 보여주는 코드)
+if True: 
     st.divider()
-    st.markdown("### 🕵️‍♂️ 관리자 모드 감지됨 (Admin Mode Detected)")
-    st.info("이 메뉴는 일반 사용자에게는 보이지 않습니다.")
+    st.error("🚨 관리자 모드 강제 실행 중 (들여쓰기 확인용)")
+    
+    # ... (나머지 코드는 그대로 둠)
     
     # 2. 관리자 비밀번호 설정 (원하는 걸로 바꾸세요!)
     ADMIN_PASSWORD = "1234" 
