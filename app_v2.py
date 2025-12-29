@@ -343,3 +343,6 @@ if True:
             
     elif input_pw:
         st.error("비밀번호가 틀렸습니다! (Wrong Password)")
+
+# 디버깅용: 현재 앱이 인식하는 주소창 파라미터를 화면에 출력
+st.write("현재 인식된 파라미터:", st.query_params)
