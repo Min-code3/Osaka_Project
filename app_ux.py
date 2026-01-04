@@ -189,7 +189,7 @@ if st.session_state.page == 'home':
         st.write("") 
 
         st.write(f"**{txt['type_label']}**")
-        selected_type = st.pills("Type", txt['btns'], selection_mode="single", default=None, label_visibility="collapsed")
+        selected_type = st.pills("Type", txt['btns'], selection_mode="multi", default=[], label_visibility="collapsed")
         st.divider()
 
         c1, c2 = st.columns(2)
@@ -233,8 +233,9 @@ if st.session_state.page == 'home':
         else:
             filtered_df = filtered_df[filtered_df['Hub_KR'].astype(str).str.contains('난바|우메다', na=False)]
             
-        # (2) 타입 필터 (랜드마크, 시내 등)
-        filtered_df = filtered_df[filtered_df[target_col_loc] == selected_type]
+        # (2) 타입 필터 (선택한 모든 타입 포함)
+        if selected_type:
+            filtered_df = filtered_df[filtered_df[target_col_loc].isin(selected_type)]
 
         # (3) 카테고리 & 그룹 다중 선택 필터
         if sel_cats:
