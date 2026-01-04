@@ -275,9 +275,9 @@ if st.session_state.page == 'home':
                             use_container_width=True
                         )
 
-# ---------------------------------------------------------
-# [PAGE 2] 상세 페이지
-# ---------------------------------------------------------
+# ==========================================
+# [PAGE 2] 상세 페이지 (지도 클릭 기능 추가됨!)
+# ==========================================
 elif st.session_state.page == 'detail':
     row = st.session_state.current_place # 현재 선택된 장소 데이터
     
@@ -286,7 +286,7 @@ elif st.session_state.page == 'detail':
         go_back_to_list()
         st.rerun()
     
-    # Zone(구역) 컬럼 이름 방어 로직 (대소문자 처리)
+    # Zone(구역) 컬럼 이름 방어 로직
     zone_col = 'Zone'
     if 'ZONE' in df.columns: zone_col = 'ZONE'
     elif 'zone' in df.columns: zone_col = 'zone'
@@ -295,7 +295,7 @@ elif st.session_state.page == 'detail':
     if pd.isna(current_zone) or current_zone == 'nan': current_zone = ""
 
     # -----------------------------------------------------
-    # 2. [Top] 지도 표시 (Folium)
+    # 2. [Top] 지도 표시 (Interactive Map)
     # -----------------------------------------------------
     has_map_data = False
     if 'lat' in row and 'lon' in row:
@@ -306,10 +306,10 @@ elif st.session_state.page == 'detail':
             if dest_lat != 0 and dest_lon != 0:
                 has_map_data = True
                 
-                # 지도 생성 (확대 레벨 14)
+                # 지도 생성
                 m = folium.Map(location=[dest_lat, dest_lon], zoom_start=14)
                 
-                # (1) [Fixed] 주요 거점 3곳 (난바/우메다/교토역) -> 초록색 집 아이콘
+                # (1) [Fixed] 주요 거점 3곳 (초록색 집)
                 fixed_hubs = {
                     "난바 (Namba)": [34.6655, 135.5006],
                     "우메다 (Umeda)": [34.7025, 135.4959],
@@ -323,7 +323,7 @@ elif st.session_state.page == 'detail':
                         icon=folium.Icon(color='green', icon='home') 
                     ).add_to(m)
 
-                # (2) [Neighbors] 같은 구역의 주변 장소 -> 파란색 i 아이콘
+                # (2) [Neighbors] 같은 구역 주변 장소 (파란색 i)
                 if current_zone:
                     nearby_places = df[
                         (df[zone_col] == current_zone) & 
@@ -340,7 +340,7 @@ elif st.session_state.page == 'detail':
                             ).add_to(m)
                         except: continue
 
-                # (3) [Main] 현재 선택한 장소 -> 빨간색 별 아이콘
+                # (3) [Main] 현재 장소 (빨간색 별)
                 folium.Marker(
                     [dest_lat, dest_lon],
                     popup=f"📍 {row[cols['name']]} (Here!)",
@@ -348,12 +348,36 @@ elif st.session_state.page == 'detail':
                     icon=folium.Icon(color='red', icon='star')
                 ).add_to(m)
 
-                # 지도 화면에 출력
+                # -----------------------------------------------------------------
+                # [핵심] 지도 출력 및 클릭 이벤트 수신
+                # -----------------------------------------------------------------
                 zone_msg = f"({current_zone})" if current_zone else ""
                 st.markdown(f"### 📍 Location: {row[cols['area']]} {zone_msg}")
-                st_folium(m, width=None, height=400, use_container_width=True)
                 
-        except Exception:
+                # 지도를 변수에 담습니다 (클릭 정보를 받기 위함)
+                map_output = st_folium(m, width=None, height=400, use_container_width=True)
+
+                # [지도 클릭 로직] 만약 지도에서 무언가 클릭되었다면?
+                if map_output and map_output['last_object_clicked']:
+                    clicked_lat = map_output['last_object_clicked']['lat']
+                    clicked_lng = map_output['last_object_clicked']['lng']
+                    
+                    # 1. 클릭한 좌표가 우리 데이터(df)에 있는지 찾습니다. (오차 범위 미세 허용)
+                    # (실수형 좌표 비교라 정확히 일치하지 않을 수 있어 약간의 반올림 처리 등을 고려하지만, Folium은 보통 정확히 줍니다)
+                    found_place = df[
+                        (df['lat'].sub(clicked_lat).abs() < 0.0001) & 
+                        (df['lon'].sub(clicked_lng).abs() < 0.0001)
+                    ]
+                    
+                    # 2. 데이터가 있고, 현재 보고 있는 장소가 아니라면 -> 이동!
+                    if not found_place.empty:
+                        new_place_row = found_place.iloc[0]
+                        if new_place_row['Name_KR'] != row['Name_KR']:
+                            go_detail(new_place_row) # 상세페이지 이동 및 로그 기록
+                            st.rerun() # 화면 새로고침
+
+        except Exception as e:
+            # st.error(f"Map Error: {e}") # 디버깅용
             pass
 
     # 지도와 상세 내용 구분선
@@ -371,12 +395,11 @@ elif st.session_state.page == 'detail':
         img_path = os.path.join("images", f"{name_en}.jpg")
         img_html = get_local_image_html(img_path, height="350px", radius="12px")
         
-        # 구글 이미지 검색 링크 가져오기 (이미지 클릭 시 이동)
+        # 구글 이미지 검색 링크
         g_img_col = 'Google_Image_KR' if language == "🇰🇷 한국어" else 'Google_Image_EN'
         google_img_url = row.get(g_img_col, '#')
         
         if str(google_img_url).startswith('http'):
-            # 이미지를 <a> 태그로 감싸서 클릭 가능하게 만듦
             linked_img_html = f'<a href="{google_img_url}" target="_blank">{img_html}</a>'
             st.markdown(linked_img_html, unsafe_allow_html=True)
         else:
@@ -386,25 +409,21 @@ elif st.session_state.page == 'detail':
         st.title(row[cols['name']])
         st.caption(f"⏱️ 소요시간: 약 {row['Deep_Time']}분 (Duration)")
         
-        # 설명글
         st.markdown("#### 📝 Description")
         st.write(row[cols['desc']])
         
-        # 이미지 클릭 안내 문구
         note_msg = "* 이미지를 클릭하면 더 많은 사진을 볼 수 있습니다." if language == "🇰🇷 한국어" else "* Click the image to see more photos on Google."
         st.caption(f"ℹ️ {note_msg}")
         
         st.write("")
-        # 태그 표시
         tags = str(row[cols['tag']]).split('#')
         st.info("   ".join([f"#{t.strip()}" for t in tags if t.strip()]))
         
-        # 구글맵 앱으로 열기 버튼
         map_link = row.get(cols['map'], '')
         if str(map_link).startswith('http'):
             st.link_button("🗺️ Open Google Map (App)", map_link, use_container_width=True)
 
-    # [오른쪽] 같은 구역 추천 리스트 영역
+    # [오른쪽] 추천 리스트
     with col_right:
         st.subheader("🔭 Nearby Places")
         st.caption(f"Same Zone: {current_zone}")
@@ -427,7 +446,6 @@ elif st.session_state.page == 'detail':
                     with rc2:
                         st.write(f"**{rec_row[cols['name']]}**")
                         st.caption(f"{rec_row[cols['cat']]}")
-                        # [이동] 버튼 클릭 시 상세 페이지로 이동
                         if st.button("View", key=f"rec_{rec_name_en}", use_container_width=True):
                             go_detail(rec_row)
                             st.rerun()
