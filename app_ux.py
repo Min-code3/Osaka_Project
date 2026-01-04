@@ -5,7 +5,7 @@ import os
 import folium
 from streamlit_folium import st_folium
 
-# [추가] 로그 및 시간 관련 라이브러리
+# [NEW] 로그 및 시간 관련 라이브러리
 import logging
 from datetime import datetime
 import pytz
@@ -13,21 +13,23 @@ import pytz
 # ---------------------------------------------------------
 # 0. 로깅 설정 (Log Tracking)
 # ---------------------------------------------------------
+# 배포 후 관리자 화면(Manage App -> Logs)에서 확인 가능
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def log_action(action, details=""):
-    """사용자 행동을 로그로 남기는 함수"""
+    """사용자 행동을 로그로 남기는 함수 (한국 시간 기준)"""
     try:
         kst = pytz.timezone('Asia/Seoul') 
         now = datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
     except:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # pytz 에러 시 기본 시간
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # pytz 에러 대비
         
     log_msg = f"[{now}] ACTION: {action} | DETAILS: {details}"
     
-    # 콘솔 출력 (Streamlit Cloud Logs에서 확인 가능)
+    # 1. 콘솔에 출력 (Streamlit Cloud Logs에서 보임)
     print(log_msg) 
+    # 2. 로거에도 기록
     logger.info(log_msg)
 
 # ---------------------------------------------------------
@@ -82,10 +84,11 @@ def load_data():
 df = load_data()
 
 # ---------------------------------------------------------
-# 2. 세션 상태 관리
+# 2. 세션 상태 관리 & 로그 트리거
 # ---------------------------------------------------------
 if 'page' not in st.session_state:
     st.session_state.page = 'home'
+    # [LOG] 앱 최초 접속
     log_action("APP_START", "User entered the app")
 
 if 'current_place' not in st.session_state:
@@ -94,11 +97,13 @@ if 'current_place' not in st.session_state:
 def go_detail(row):
     st.session_state.current_place = row
     st.session_state.page = 'detail'
+    # [LOG] 상세 페이지 진입
     log_action("VIEW_DETAIL", f"Place: {row['Name_KR']} ({row['Name_EN']})")
 
 def go_back_to_list():
     st.session_state.page = 'home'
     st.session_state.current_place = None
+    # [LOG] 목록으로 복귀
     log_action("BACK_TO_LIST", "Returned to list view")
 
 # ---------------------------------------------------------
@@ -194,7 +199,7 @@ if st.session_state.page == 'home':
         if sel_grps:
             filtered_df = filtered_df[filtered_df[cols['grp']].apply(lambda x: any(g in str(x) for g in sel_grps))]
 
-        # [로그] 필터링 결과 수 기록
+        # [LOG] 필터링 결과 수 기록 (조건 변경 시마다)
         if 'last_filter_count' not in st.session_state or st.session_state.last_filter_count != len(filtered_df):
             st.session_state.last_filter_count = len(filtered_df)
             log_msg = f"Region:{selected_region}, Type:{selected_type}, Cats:{sel_cats} -> Result:{len(filtered_df)}"
@@ -219,6 +224,7 @@ if st.session_state.page == 'home':
                         st.write(f"**{row[cols['name']]}**")
                         st.caption(f"📍 {row[cols['area']]}")
                         
+                        # 상세보기 버튼 (로그는 go_detail 함수 안에서 찍힘)
                         st.button(
                             txt['dtl_btn'], 
                             key=f"btn_{name_en}", 
@@ -378,5 +384,5 @@ elif st.session_state.page == 'detail':
                         st.caption(f"{rec_row[cols['cat']]}")
                         
                         if st.button("View", key=f"rec_{rec_name_en}", use_container_width=True):
-                            go_detail(rec_row)
+                            go_detail(rec_row) # 이동 시 상세조회 로그 찍힘
                             st.rerun()
