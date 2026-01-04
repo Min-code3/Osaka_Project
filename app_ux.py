@@ -154,7 +154,7 @@ if st.session_state.page == 'home':
 # ---------------------------------------------------------
 
 # ==========================================
-# [PAGE 1] 홈 & 리스트
+# [PAGE 1] 홈 & 리스트 (로그 기능 강화판)
 # ==========================================
 if st.session_state.page == 'home':
     
@@ -181,29 +181,43 @@ if st.session_state.page == 'home':
     if not selected_type:
         st.info(txt['guide'])
     else:
-        # 필터링
+        # 1. 데이터 필터링
         filtered_df = df.copy()
         target_col_loc = 'Landmark_KR' if language == "🇰🇷 한국어" else 'Landmark_EN'
         
-        # 지역 필터 (Hub 기준)
+        # 지역 필터
         is_kyoto = (selected_region == txt['regions'][1])
         if is_kyoto:
             filtered_df = filtered_df[filtered_df['Hub_KR'].astype(str).str.contains('교토|기온', na=False)]
         else:
             filtered_df = filtered_df[filtered_df['Hub_KR'].astype(str).str.contains('난바|우메다', na=False)]
             
+        # 타입 필터
         filtered_df = filtered_df[filtered_df[target_col_loc] == selected_type]
 
+        # 카테고리 & 그룹 필터
         if sel_cats:
             filtered_df = filtered_df[filtered_df[cols['cat']].apply(lambda x: any(c in str(x) for c in sel_cats))]
         if sel_grps:
             filtered_df = filtered_df[filtered_df[cols['grp']].apply(lambda x: any(g in str(x) for g in sel_grps))]
 
-        # [LOG] 필터링 결과 수 기록 (조건 변경 시마다)
-        if 'last_filter_count' not in st.session_state or st.session_state.last_filter_count != len(filtered_df):
-            st.session_state.last_filter_count = len(filtered_df)
-            log_msg = f"Region:{selected_region}, Type:{selected_type}, Cats:{sel_cats} -> Result:{len(filtered_df)}"
+        # -----------------------------------------------------------------------
+        # [강화된 로그] 결과 개수가 아니라 '선택 조건'이 바뀌면 무조건 기록
+        # -----------------------------------------------------------------------
+        # 현재 선택된 조건들을 하나의 문자열로 만듭니다.
+        current_filter_state = f"{selected_region}|{selected_type}|{sel_cats}|{sel_grps}"
+        
+        # 세션에 저장된 이전 조건과 비교합니다.
+        if 'last_filter_state' not in st.session_state:
+            st.session_state.last_filter_state = ""
+            
+        if st.session_state.last_filter_state != current_filter_state:
+            st.session_state.last_filter_state = current_filter_state
+            
+            # 로그 내용에 '무엇을 선택했는지' 자세히 남깁니다.
+            log_msg = f"Region:{selected_region}, Type:{selected_type}, Cats:{sel_cats}, Grps:{sel_grps} -> Count:{len(filtered_df)}"
             log_action("SEARCH_FILTER", log_msg)
+        # -----------------------------------------------------------------------
 
         st.subheader(f"{txt['res']}: {len(filtered_df)}")
 
@@ -224,7 +238,6 @@ if st.session_state.page == 'home':
                         st.write(f"**{row[cols['name']]}**")
                         st.caption(f"📍 {row[cols['area']]}")
                         
-                        # 상세보기 버튼 (로그는 go_detail 함수 안에서 찍힘)
                         st.button(
                             txt['dtl_btn'], 
                             key=f"btn_{name_en}", 
