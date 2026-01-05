@@ -110,7 +110,7 @@ df = load_data()
 
 if 'page' not in st.session_state:
     st.session_state.page = 'home' # 현재 페이지 (home / detail)
-    log_action("APP_START", "User entered the app") # [로그] 최초 접속
+    #log_action("APP_START", "User entered the app") # [로그] 최초 접속 #지속적인 더미 데이터로 주석처리_삭제
 
 if 'current_place' not in st.session_state:
     st.session_state.current_place = None # 현재 선택한 장소 정보
@@ -205,16 +205,20 @@ if st.session_state.page == 'home':
     # [핵심] 필터 로그 기록 (조건 변경 즉시 기록)
     # ---------------------------------------------------------------------------
     # 현재 사용자가 선택한 모든 조건을 하나의 문자열로 만듭니다.
+    # [로그] 필터 변경 기록 (의미 있는 클릭만 남기기)
     current_state_str = f"Region:{selected_region} | Type:{selected_type} | Cats:{sel_cats} | Grps:{sel_grps}"
     
-    # 세션에 '직전 선택 상태'가 없으면 초기화
     if 'last_filter_state' not in st.session_state:
         st.session_state.last_filter_state = ""
     
-    # 직전 상태와 현재 상태가 다르면 (즉, 버튼을 하나라도 눌렀으면) 로그 전송
+    # 직전 상태와 현재 상태가 다르면 로직 진입
     if st.session_state.last_filter_state != current_state_str:
         st.session_state.last_filter_state = current_state_str
-        log_action("FILTER_CHANGE", current_state_str) # [로그] 필터 변경
+        
+        # ⭐ 사용자가 'Type'을 최소 하나라도 선택했을 때만 로그를 기록합니다.
+        # 서버의 자동 상태 점검(Health Check)은 Type이 비어있으므로 무시됩니다.
+        if selected_type: 
+            log_action("FILTER_CHANGE", current_state_str)
 
     # ---------------------------------------------------------------------------
 
