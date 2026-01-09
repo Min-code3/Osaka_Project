@@ -19,21 +19,22 @@ logger = logging.getLogger(__name__)
 
 def log_action(action, details=""):
     """
-    사용자의 행동을 서버 로그로 남기는 함수입니다.
-    - action: 행동 이름 (예: VIEW_DETAIL, SEARCH_FILTER)
-    - details: 상세 내용 (예: 어떤 장소를 클릭했는지)
+    사용자의 행동을 서버 로그로 남기는 함수
     """
     try:
-        # 한국 시간(KST) 기준으로 시간 기록
+        # 한국 시간(KST) 설정
         kst = pytz.timezone('Asia/Seoul') 
         now = datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
     except:
-        # 시간 설정 에러 시 기본 시간 사용
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-    log_msg = f"[{now}] ACTION: {action} | DETAILS: {details}"
     
-    # 1. 콘솔 출력 (클라우드 로그창에 표시됨)
+    # [추가됨] 현재 접속자가 누구인지 세션에서 몰래 가져옴 (없으면 unknown)
+    visitor_id = st.session_state.get('visitor_id', 'unknown')
+
+    # 로그 메시지에 USER: {visitor_id} 추가
+    log_msg = f"[{now}] USER: [{visitor_id}] | ACTION: {action} | DETAILS: {details}"
+    
+    # 1. 콘솔 출력 (클라우드 로그창에서 님이 확인하는 용도)
     print(log_msg) 
     # 2. 로거에 기록
     logger.info(log_msg)
@@ -106,14 +107,25 @@ df = load_data()
 # =========================================================
 # 2. 세션 상태(Session State) 관리
 # =========================================================
-# 페이지가 새로고침되어도 변수를 기억하기 위함
+
+# [추가됨] URL에서 몰래 ID 가져오기 (?id=cheolsoo)
+# 페이지가 새로고침되어도 유지하기 위해 session_state에 저장
+if 'visitor_id' not in st.session_state:
+    # 1. URL 파라미터 확인
+    query_params = st.query_params
+    # 'id'라는 키가 있으면 가져오고, 없으면 'anonymous'
+    visitor_id = query_params.get("id", "anonymous")
+    
+    st.session_state.visitor_id = visitor_id
+    
+    # [로그] 최초 접속 기록 (이때 누가 들어왔는지 찍힘)
+    log_action("ENTER_APP", "User accessed the app")
 
 if 'page' not in st.session_state:
-    st.session_state.page = 'home' # 현재 페이지 (home / detail)
-    #log_action("APP_START", "User entered the app") # [로그] 최초 접속 #지속적인 더미 데이터로 주석처리_삭제
+    st.session_state.page = 'home'
 
 if 'current_place' not in st.session_state:
-    st.session_state.current_place = None # 현재 선택한 장소 정보
+    st.session_state.current_place = None
 
 # 페이지 이동 함수들
 def go_detail(row):
