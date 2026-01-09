@@ -4,40 +4,80 @@ import base64
 import os
 import folium
 from streamlit_folium import st_folium
-
-# [로그/시간] 로그 추적을 위한 라이브러리
 import logging
 from datetime import datetime
 import pytz
 
+# [NEW] 구글 시트 연동 라이브러리
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 # =========================================================
-# 0. 로깅(Log) 설정: 사용자 행동 추적
+# 0. 로깅(Log) 설정: 구글 시트 자동 저장 기능 추가
 # =========================================================
-# 배포 후 'Manage app -> Logs' 메뉴에서 확인 가능한 설정입니다.
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 구글 시트 연결 함수 (캐싱해서 속도 향상)
+@st.cache_resource
+def get_google_sheet_connection():
+    try:
+        # Streamlit Secrets에서 키 정보 가져오기
+        secrets = st.secrets["gcp_service_account"]
+        
+        # 인증 범위 설정
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        
+        # 인증 자격 증명 생성
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(secrets, scope)
+        client = gspread.authorize(creds)
+        
+        return client
+    except Exception as e:
+        print(f"구글 시트 연결 실패: {e}")
+        return None
+
+def save_log_to_sheet(log_data):
+    """기존 오사카 데이터 시트의 'Logs' 탭에 저장"""
+    try:
+        client = get_google_sheet_connection()
+        if client:
+            # 1. 시트 ID로 파일 열기 (URL에 있는 그 긴 문자열)
+            # 님이 코드에 이미 가지고 있는 그 ID입니다.
+            sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
+            
+            # 2. 파일 열기 -> 'Logs'라는 이름의 탭 선택
+            spreadsheet = client.open_by_key(sheet_id)
+            worksheet = spreadsheet.worksheet("Logs") # <-- 여기가 핵심!
+            
+            # 3. 데이터 추가
+            worksheet.append_row(log_data)
+            
+    except Exception as e:
+        print(f"로그 저장 실패: {e}")
+
 def log_action(action, details=""):
     """
-    사용자의 행동을 서버 로그로 남기는 함수
+    사용자 행동을 1) 서버 로그 2) 구글 시트에 동시에 남김
     """
     try:
-        # 한국 시간(KST) 설정
         kst = pytz.timezone('Asia/Seoul') 
         now = datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
     except:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # [추가됨] 현재 접속자가 누구인지 세션에서 몰래 가져옴 (없으면 unknown)
+    # 현재 접속자 ID 가져오기
     visitor_id = st.session_state.get('visitor_id', 'unknown')
 
-    # 로그 메시지에 USER: {visitor_id} 추가
+    # 1. 서버 로그 (Manage App > Logs 확인용)
     log_msg = f"[{now}] USER: [{visitor_id}] | ACTION: {action} | DETAILS: {details}"
-    
-    # 1. 콘솔 출력 (클라우드 로그창에서 님이 확인하는 용도)
     print(log_msg) 
-    # 2. 로거에 기록
     logger.info(log_msg)
+
+    # 2. 구글 시트 저장 (영구 보관용) [NEW]
+    # 순서: 시간, 유저ID, 행동, 상세내용
+    row_data = [now, visitor_id, action, details]
+    save_log_to_sheet(row_data)
 
 # =========================================================
 # 1. 기본 환경 설정 및 유틸리티 함수
