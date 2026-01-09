@@ -3,3 +3,5 @@ pandas
 folium
 streamlit-folium
 pytz
+gspread
+oauth2client
