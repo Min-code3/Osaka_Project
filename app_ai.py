@@ -12,7 +12,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import random
 
 # =========================================================
-# [1] 기본 설정 및 로그
+# [1] 기본 설정 및 로그 (구글 시트 저장 기능 포함)
 # =========================================================
 import logging
 from datetime import datetime
@@ -25,39 +25,49 @@ import base64
 import pandas as pd
 import random
 
+# 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# 1. 구글 시트 연결 권한 얻기 (캐싱 적용)
 @st.cache_resource
 def get_google_sheet_connection():
     try:
-        if "gcp_service_account" not in st.secrets: return None
+        # Secrets에 키가 있는지 확인
+        if "gcp_service_account" not in st.secrets: 
+            return None
+            
         secrets = st.secrets["gcp_service_account"]
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(secrets, scope)
         client = gspread.authorize(creds)
         return client
-    except Exception: return None
+    except Exception as e:
+        print(f"Connection Error: {e}")
+        return None
 
+# 2. 실제로 시트에 저장하는 함수
 def save_log_to_sheet(log_data):
     try:
         client = get_google_sheet_connection()
         if client:
-            # [중요] 같은 파일이므로 ID는 그대로 유지합니다.
+            # 가이드님의 구글 스프레드시트 ID
             sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
             spreadsheet = client.open_by_key(sheet_id)
             
-            # [수정 포인트] 탭 이름을 "Logs_ai"로 변경!
-            # (구글 시트에 이 이름의 탭이 꼭 있어야 합니다)
+            # [수정 포인트] 가이드님이 만든 탭 이름 "Logs_ai"로 변경!
+            # 주의: 엑셀 하단 탭 이름이 정확히 Logs_ai 여야 합니다.
             worksheet = spreadsheet.worksheet("Logs_ai")
             
+            # 데이터 한 줄 추가
             worksheet.append_row(log_data)
-            print(f"✅ 로그 저장 성공: {log_data}") # 배포 앱 로그창에서 확인용
+            print(f"✅ 저장 성공: {log_data}") 
     except Exception as e:
-        # 에러가 나면 앱이 멈추지 않게 넘기되, 이유는 출력함
-        print(f"❌ 로그 저장 실패: {e}")
+        # 에러 나면 콘솔에만 출력 (앱 멈춤 방지)
+        print(f"❌ 저장 실패: {e}")
         pass 
 
+# 3. 앱 전체에서 사용할 로그 함수
 def log_action(action, details=""):
     try:
         kst = pytz.timezone('Asia/Seoul') 
@@ -65,9 +75,13 @@ def log_action(action, details=""):
     except:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # 사용자 ID 가져오기 (없으면 unknown)
     visitor_id = st.session_state.get('visitor_id', 'unknown')
     
-    # 구글 시트로 전송
+    # 콘솔에 출력 (확인용)
+    print(f"[{now}] {visitor_id} - {action}: {details}")
+    
+    # [핵심] 구글 시트로 전송!
     save_log_to_sheet([now, visitor_id, action, details])
 
 # =========================================================
