@@ -669,3 +669,52 @@ elif st.session_state.page == 'detail':
                         if st.button("View", key=f"rec_{r_name_en}", use_container_width=True):
                             go_detail(r_row)
                             st.rerun()
+
+# =========================================================
+# [긴급] 디버깅용 코드 (앱 맨 아래에 추가하세요)
+# =========================================================
+st.divider()
+st.subheader("🛠️ 관리자 디버깅 패널")
+
+if st.button("🚀 시스템 연결 테스트 (클릭)"):
+    st.write("1. 테스트 시작...")
+    
+    # 1. 시크릿 확인
+    if "gcp_service_account" in st.secrets:
+        st.success("✅ Secrets(비밀번호) 확인됨")
+    else:
+        st.error("❌ Secrets가 비어있습니다! Streamlit 설정 확인 필요.")
+    
+    # 2. 구글 연결 시도
+    try:
+        st.write("2. 구글 서버에 접속 시도 중...")
+        client = get_google_sheet_connection()
+        if client:
+            st.success("✅ 구글 클라이언트 연결 성공!")
+            
+            # 3. 시트 및 탭 확인
+            try:
+                sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4"
+                st.write(f"3. 시트 ID({sheet_id[:5]}...) 찾는 중...")
+                spreadsheet = client.open_by_key(sheet_id)
+                st.success(f"✅ 엑셀 파일 찾음: {spreadsheet.title}")
+                
+                st.write("4. 'Logs_ai' 탭 찾는 중...")
+                worksheet = spreadsheet.worksheet("Logs_ai")
+                st.success("✅ 'Logs_ai' 탭 찾음!")
+                
+                # 4. 실제 쓰기 테스트
+                st.write("5. 테스트 데이터 쓰기 시도...")
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                worksheet.append_row([now, "TEST_USER", "DEBUG_TEST", "시스템 점검 중입니다"])
+                st.success("🎉 [최종 성공] 데이터가 엑셀에 저장되었습니다! 엑셀을 확인하세요.")
+                
+            except gspread.exceptions.WorksheetNotFound:
+                st.error("❌ [실패] 'Logs_ai' 탭이 없습니다! 엑셀 탭 이름을 확인하세요.")
+            except Exception as e:
+                st.error(f"❌ [실패] 시트/탭 접근 중 에러: {e}")
+        else:
+            st.error("❌ 구글 연결 실패 (Client is None)")
+            
+    except Exception as e:
+        st.error(f"❌ [치명적 에러] 연결 과정에서 멈춤: {e}")
