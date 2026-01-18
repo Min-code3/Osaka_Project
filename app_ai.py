@@ -671,47 +671,39 @@ elif st.session_state.page == 'detail':
                             st.rerun()
 
 # =========================================================
-# [긴급] 디버깅용 패널 (앱 맨 아래에 추가)
+# [긴급] 사이드바 디버깅 패널 (들여쓰기 없이 맨 앞에 붙이세요!)
 # =========================================================
-st.divider()
-st.subheader("🛠️ 관리자 시스템 점검")
-
-if st.button("🚀 연결 테스트 시작 (Click)"):
-    st.write("1. Secrets 확인 중...")
-    if "gcp_service_account" in st.secrets:
-        st.success("✅ Secrets(비밀번호) 있음")
-        
-        try:
-            st.write("2. 구글 접속 시도...")
-            client = get_google_sheet_connection()
-            if client:
-                st.success("✅ 구글 서버 연결 성공!")
-                
-                # 시트 열기 시도
-                sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4"
-                st.write(f"3. 엑셀 파일(ID: ...{sheet_id[-5:]}) 여는 중...")
-                spreadsheet = client.open_by_key(sheet_id)
-                st.success(f"✅ 엑셀 파일 찾음: {spreadsheet.title}")
-                
-                # 탭 열기 시도
-                st.write("4. 'Logs_ai' 탭 찾는 중...")
-                worksheet = spreadsheet.worksheet("Logs_ai")
-                st.success("✅ 'Logs_ai' 탭 찾음!")
-                
-                # 쓰기 시도
-                st.write("5. 테스트 데이터 쓰기...")
-                worksheet.append_row(["TEST", "SYSTEM_CHECK", "연결 성공", "화이팅"])
-                st.balloons()
-                st.success("🎉 [최종 성공] 엑셀에 데이터가 저장되었습니다! 확인해보세요.")
-                
-            else:
-                st.error("❌ 구글 연결 실패 (Client is None)")
-        except gspread.exceptions.WorksheetNotFound:
-            st.error("❌ [실패] 엑셀에 'Logs_ai' 탭이 없습니다! 탭 이름을 확인하세요.")
-        except gspread.exceptions.APIError as e:
-            st.error(f"❌ [권한 실패] 로봇이 '편집자'가 아닙니다. 공유 설정을 확인하세요! \n에러: {e}")
-        except Exception as e:
-            st.error(f"❌ [에러 발생] 원인: {e}")
+with st.sidebar:
+    st.divider()
+    st.header("🔧 시스템 점검")
+    
+    if st.button("🚀 연결 테스트 (Click)", key="debug_btn"):
+        st.write("1. 시크릿 확인...")
+        if "gcp_service_account" in st.secrets:
+            st.success("✅ Secrets 있음")
             
-    else:
-        st.error("❌ Secrets가 비어있습니다! Streamlit 설정에 비밀번호를 넣어주세요.")
+            try:
+                # 구글 연결 시도
+                client = get_google_sheet_connection()
+                if client:
+                    st.success("✅ 구글 연결 성공")
+                    
+                    # 시트 열기
+                    sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
+                    spreadsheet = client.open_by_key(sheet_id)
+                    st.write(f"📄 파일: {spreadsheet.title}")
+                    
+                    # 탭 열기
+                    worksheet = spreadsheet.worksheet("Logs_ai")
+                    st.success("✅ 탭(Logs_ai) 찾음!")
+                    
+                    # 쓰기 테스트
+                    worksheet.append_row(["TEST", "Sidebar_Check", "성공", "Success"])
+                    st.success("🎉 저장 완료! 엑셀 확인하세요.")
+                    
+                else:
+                    st.error("❌ 연결 객체 없음(None)")
+            except Exception as e:
+                st.error(f"❌ 에러 발생: {e}")
+        else:
+            st.error("❌ Secrets 설정 안됨")
