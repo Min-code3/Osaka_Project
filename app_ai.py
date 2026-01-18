@@ -14,17 +14,6 @@ import random
 # =========================================================
 # [1] 기본 설정 및 로그 (상세 로그 + 엑셀 저장 통합)
 # =========================================================
-import logging
-from datetime import datetime
-import pytz
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import streamlit as st
-import os
-import base64
-import pandas as pd
-import random
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -47,11 +36,11 @@ def save_log_to_sheet(log_data):
         if client:
             sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
             spreadsheet = client.open_by_key(sheet_id)
-            worksheet = spreadsheet.worksheet("Logs_ai") # 탭 이름 확인
+            worksheet = spreadsheet.worksheet("Logs_ai")
             worksheet.append_row(log_data)
     except Exception: pass 
 
-# [핵심] 로그 통합 함수 (화면 출력 + 엑셀 저장)
+# 로그 통합 함수
 def log_action(action, details=""):
     try:
         kst = pytz.timezone('Asia/Seoul') 
@@ -61,12 +50,12 @@ def log_action(action, details=""):
     
     visitor_id = st.session_state.get('visitor_id', 'unknown')
     
-    # 1. Manage App 화면(콘솔)에 상세 출력 (이전 버전 기능 부활)
+    # 1. 화면 출력
     log_msg = f"[{now}] ACTION: {action} | DETAILS: {details}"
     print(log_msg)       
     logger.info(log_msg) 
     
-    # 2. 엑셀에 저장
+    # 2. 엑셀 저장
     save_log_to_sheet([now, visitor_id, action, details])
 
 # =========================================================
@@ -132,34 +121,30 @@ if 'survey_answers' not in st.session_state: st.session_state.survey_answers = {
 if 'swap_q1' not in st.session_state: st.session_state.swap_q1 = random.choice([True, False])
 if 'swap_q2' not in st.session_state: st.session_state.swap_q2 = random.choice([True, False])
 
-# --- 이동 함수 (상세 로그 포함) ---
+# --- 이동 함수 ---
 def go_page_recommendation(selected_type_val):
     st.session_state.previous_page = st.session_state.page 
     st.session_state.user_type = selected_type_val
     st.session_state.page = 'recommendation'
-    # [로그] 결과 페이지 진입 기록
-    log_action("GO_RECOMMENDATION", f"Result Type: {selected_type_val}")
+    log_action("GO_REC", f"Type: {selected_type_val}")
     st.rerun()
 
 def go_page_all_places():
     st.session_state.previous_page = st.session_state.page 
     st.session_state.page = 'all_places'
-    # [로그] 전체 보기 진입 기록
-    log_action("GO_ALL_PLACES", "Entered All Places View")
+    log_action("GO_ALL", "Viewed all places")
     st.rerun()
 
 def go_detail(row):
     st.session_state.previous_page = st.session_state.page
     st.session_state.current_place = row
     st.session_state.page = 'detail'
-    # [로그] 상세보기 클릭 (장소 이름 상세 기록)
-    place_name = f"{row['Name_KR']} ({row['Name_EN']})"
-    log_action("VIEW_DETAIL", f"Place: {place_name}")
+    log_action("VIEW_DETAIL", f"Place: {row['Name_KR']}")
 
 def go_back():
     st.session_state.page = st.session_state.previous_page
     st.session_state.current_place = None
-    log_action("NAV_BACK", "Clicked Back Button")
+    log_action("NAV_BACK", "Back button clicked")
     st.rerun()
 
 def go_retake_survey():
@@ -169,8 +154,9 @@ def go_retake_survey():
     st.session_state.survey_answers = {'q1': None, 'q2': None}
     st.session_state.swap_q1 = random.choice([True, False])
     st.session_state.swap_q2 = random.choice([True, False])
-    log_action("RETAKE_SURVEY", "Restarted Survey")
+    log_action("RETAKE_SURVEY", "Restarted survey")
     st.rerun()
+
 # =========================================================
 # [4] 텍스트 설정 & DB 매핑
 # =========================================================
@@ -192,21 +178,15 @@ if language == "한국어":
     txt = {
         'title': "오사카/교토 여행지 리스트", 
         'survey_title': "여행에서 더 끌리는 곳",
-        
-        # [수정] 아래 버튼 클릭 삭제
         'survey_sub': "", 
-        
-        'q1_landmark': "사람은 많아도, 랜드마크", 
-        'q1_local': "덜 유명해도, 로컬 스팟",
-        
+        'q1_landmark': "사람은 많아도, 유명한 랜드마크", 
+        'q1_local': "숨겨진 한적한 로컬 스팟",
         'q2b_title': "더 선호하는 랜드마크",
         'q2b_crowded': "사람은 많아도, 가까운 곳", 
-        'q2b_far': "조금 멀어도, 덜 붐비는 곳",      
-        
+        'q2b_far': "조금 멀어도, 덜 붐비는 곳",       
         'q2a_title': "로컬 스팟을 원하는 이유",
         'q2a_adventure': "남들이 가지 않는 장소를 가보고 싶어서", 
-        'q2a_quiet': "너무 많은 인파는 부담스러워서",      
-
+        'q2a_quiet': "너무 많은 인파는 부담스러워서",       
         'btn_select': "선택",
         'region_label': "도시",
         'regions': ["오사카", "교토"],
@@ -221,8 +201,7 @@ if language == "한국어":
         'back': "뒤로가기",
         'rec_title': "성향에 맞는 장소 추천",
         'rec_reset': "다시 테스트",
-        'go_all': "전체 장소",
-
+        'go_all': "전체 장소 보기",
         'type_messages': {
             "근랜드": "여행자 타입 : 상징적인 랜드마크",
             "원랜드": "낭만가 타입 : 여유롭게 즐기는 랜드마크",
@@ -236,18 +215,14 @@ else:
         'title': "Osaka/Kyoto Travel List",
         'survey_title': "Preferred Travel Destinations", 
         'survey_sub': "",
-        
-        'q1_landmark': "Famous Landmarks", 
-        'q1_local': "Hidden Local Spots", 
-        
+        'q1_landmark': "A Famous Landmark, Even If It’s Crowded",
+        'q1_local': "A Hidden Local Spot, Even If It’s Less Known", 
         'q2b_title': "Preferred Landmark Type",
         'q2b_crowded': "Accessible City Center",
         'q2b_far': "Relaxed Outskirts",
-        
         'q2a_title': "Reason for Local Preference",
         'q2a_adventure': "To Explore Undiscovered Places", 
         'q2a_quiet': "To Avoid Crowds",
-
         'btn_select': "Select",
         'region_label': "City",
         'regions': ["Osaka", "Kyoto"],
@@ -263,7 +238,6 @@ else:
         'rec_title': "Recommended Places",
         'rec_reset': "Retest",
         'go_all': "View All Places",
-
         'type_messages': {
             "근랜드": "The Traveler Type: Nearby Iconic Landmarks",
             "원랜드": "The Romantic Type: Savoring Landmarks at a Leisurely Pace",
@@ -292,7 +266,7 @@ if st.session_state.current_region not in txt['regions']:
     st.session_state.current_region = txt['regions'][0]
 
 # =========================================================
-# [PAGE 1] 설문조사 (버튼 클릭 상세 로그 추가)
+# [PAGE 1] 설문조사 (수정: 전체보기 버튼 상단 이동 & 퀵필터 삭제)
 # =========================================================
 if st.session_state.page == 'survey':
     
@@ -304,22 +278,21 @@ if st.session_state.page == 'survey':
         horizontal=True, 
         label_visibility="collapsed"
     )
-    # 지역 변경 시 로그
     if new_region != st.session_state.current_region:
-        log_action("SURVEY_REGION_CHANGE", f"Changed to {new_region}")
+        log_action("REGION_CHANGE", f"Changed to {new_region}")
         st.session_state.current_region = new_region
+        st.rerun()
 
     st.divider()
 
-    # 1단계 퀵 필터
+    # [수정] Step 1일 때만 '전체 장소 보기' 버튼을 맨 위에 노출
+    # Step 2로 가면 사라짐
     if st.session_state.survey_step == 1:
-        qc1, qc2, qc3, qc4 = st.columns(4)
-        for idx, btn_txt in enumerate(txt['btns']):
-            # 퀵 필터 클릭 로그
-            if eval(f"qc{idx+1}").button(btn_txt, use_container_width=True):
-                log_action("QUICK_FILTER_CLICK", f"Selected: {btn_txt}")
-                go_page_recommendation(TYPE_MAPPING[btn_txt])
+        if st.button(txt['go_all'], type="secondary", use_container_width=True):
+            go_page_all_places()
         st.markdown("---")
+
+    # [수정] 퀵 필터(여행자 타입 등) 버튼 4개 삭제됨
 
     if "Kyoto" in st.session_state.current_region or "교토" in st.session_state.current_region:
         region_tag = "kyoto"
@@ -340,16 +313,12 @@ if st.session_state.page == 'survey':
     st.subheader(current_title)
     IMG_HEIGHT = "250px"
 
-    # [수정] 로그 기능이 추가된 렌더링 함수
     def render_option(img_key, txt_key, val):
         st.markdown(get_local_image_html(get_img_path(img_key), height=IMG_HEIGHT), unsafe_allow_html=True)
         
-        # 버튼 클릭
         if st.button(txt[txt_key], key=f"btn_{img_key}", use_container_width=True):
-            # [로그] 사용자의 선택 상세 기록
-            step_log = f"Step {st.session_state.survey_step}"
-            choice_log = f"Selected: {txt[txt_key]} ({val})"
-            log_action("SURVEY_CHOICE", f"{step_log} | {choice_log}")
+            # [로그] 선택 기록
+            log_action("SURVEY_CHOICE", f"Step:{st.session_state.survey_step} | Selected:{val}")
 
             if st.session_state.survey_step == 1:
                 st.session_state.survey_answers['q1'] = val
@@ -373,7 +342,7 @@ if st.session_state.page == 'survey':
     # Step 2
     elif st.session_state.survey_step == 2:
         if st.button(f"⬅️ {txt['back']}"): 
-            log_action("SURVEY_BACK", "Went back to Step 1")
+            log_action("SURVEY_BACK", "Returned to Step 1")
             st.session_state.survey_step = 1
             st.rerun()
             
@@ -393,8 +362,6 @@ if st.session_state.page == 'survey':
         with col4: render_option(*right)
 
     st.divider()
-    if st.button(txt['go_all'], type="secondary", use_container_width=True):
-        go_page_all_places()
 
 # =========================================================
 # [PAGE 2] 추천 결과
@@ -432,10 +399,7 @@ elif st.session_state.page == 'recommendation':
 
     user_result_db = st.session_state.user_type 
     
-    # 멘트 가져오기
     custom_message = txt['type_messages'].get(user_result_db, "")
-    
-    # [수정 완료] '성향에 맞는 장소 추천 :' 삭제하고 핵심 문구만 출력
     st.success(f"**{custom_message}**")
 
     if 'Type' in filtered_df.columns and user_result_db:
@@ -479,7 +443,7 @@ elif st.session_state.page == 'recommendation':
         go_retake_survey()
 
 # =========================================================
-# [PAGE 3] 전체 장소 리스트 (필터 로그 상세 기록 복구)
+# [PAGE 3] 전체 장소 리스트
 # =========================================================
 elif st.session_state.page == 'all_places':
     
@@ -524,19 +488,13 @@ elif st.session_state.page == 'all_places':
         st.write("👥 **Group**")
         sel_grps = st.pills("Grps", txt['grps'], selection_mode="multi", label_visibility="collapsed")
 
-    # ---------------------------------------------------------
-    # [핵심] 필터 변경 상세 로그 기록 (복구됨)
-    # ---------------------------------------------------------
+    # [로그] 필터 변경 상세 기록
     current_filter_state = f"Region:{st.session_state.current_region} | Type:{selected_display_types} | Cats:{sel_cats} | Grps:{sel_grps}"
-    
     if 'last_filter_state' not in st.session_state:
         st.session_state.last_filter_state = ""
-        
     if st.session_state.last_filter_state != current_filter_state:
-        # Manage App과 엑셀에 상세 필터 내용을 기록합니다.
         log_action("FILTER_CHANGE", current_filter_state)
         st.session_state.last_filter_state = current_filter_state
-    # ---------------------------------------------------------
 
     if selected_display_types:
         selected_db_values = [TYPE_MAPPING[disp] for disp in selected_display_types]
@@ -573,7 +531,7 @@ elif st.session_state.page == 'all_places':
                         st.rerun()
 
 # =========================================================
-# [PAGE 4] 상세 페이지
+# [PAGE 4] 상세 페이지 (모바일 지도 최적화 적용)
 # =========================================================
 elif st.session_state.page == 'detail':
     row = st.session_state.current_place
@@ -587,7 +545,7 @@ elif st.session_state.page == 'detail':
     current_zone = str(row.get(zone_col, ''))
     if pd.isna(current_zone) or current_zone == 'nan': current_zone = ""
 
-    # [지도 로직은 그대로 유지]
+    # [지도]
     if 'lat' in row and 'lon' in row:
         try:
             dest_lat, dest_lon = float(row['lat']), float(row['lon'])
@@ -603,7 +561,15 @@ elif st.session_state.page == 'detail':
                 folium.Marker([dest_lat, dest_lon], popup=f"📍 {row[cols['name']]}", tooltip=row[cols['name']], icon=folium.Icon(color='red', icon='star')).add_to(m)
                 st.markdown(f"### 📍 Location: {row[cols['area']]} ({current_zone})")
                 
-                map_out = st_folium(m, width=None, height=400, use_container_width=True)
+                # [수정] 모바일 최적화: returned_objects를 줄여서 데이터 전송량을 최소화함
+                map_out = st_folium(
+                    m, 
+                    width=None, 
+                    height=400, 
+                    use_container_width=True,
+                    returned_objects=["last_object_clicked"] # 이것만 받아오면 훨씬 빨라짐
+                )
+                
                 if map_out and map_out['last_object_clicked']:
                     c_lat, c_lng = map_out['last_object_clicked']['lat'], map_out['last_object_clicked']['lng']
                     found = df[(df['lat'].sub(c_lat).abs() < 0.0001) & (df['lon'].sub(c_lng).abs() < 0.0001)]
@@ -618,33 +584,26 @@ elif st.session_state.page == 'detail':
     col_left, col_right = st.columns([6, 4], gap="large")
     
     with col_left:
-        # 1. 이미지 표시
         name_en = clean_filename(str(row['Name_EN']))
         img_path = os.path.join("images", f"{name_en}.jpg")
         img_html = get_local_image_html(img_path, height="350px", radius="12px")
         
         g_img_col = 'Google_Image_KR' if language == "한국어" else 'Google_Image_EN'
-        
-        # 링크가 있으면 링크 걸기
         if str(row.get(g_img_col, '')).startswith('http'): 
             st.markdown(f'<a href="{row[g_img_col]}" target="_blank">{img_html}</a>', unsafe_allow_html=True)
         else: 
             st.markdown(img_html, unsafe_allow_html=True)
             
-        # [추가 1] 이미지 하단 안내 멘트
         guide_text = "클릭 시 구글 이미지 검색으로 이동합니다" if language == "한국어" else "Click to search on Google Images"
         st.caption(f"<div style='text-align: center; margin-top: -10px;'>{guide_text}</div>", unsafe_allow_html=True)
         
         st.write("")
         st.title(row[cols['name']])
         
-        # [수정 2] DB의 Hub 컬럼을 기준으로 시간 표시
         if language == "한국어":
-            # 한국어일 땐 Hub_KR 사용 (예: "난바", "우메다")
             hub_name = str(row.get('Hub_KR', ''))
             time_ref = f"{hub_name} 기준" if hub_name else "기준"
         else:
-            # 영어일 땐 Hub_EN 사용 (예: "Namba", "Umeda")
             hub_name = str(row.get('Hub_EN', ''))
             time_ref = f"From {hub_name}" if hub_name else "From City Center"
             
