@@ -12,7 +12,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import random
 
 # =========================================================
-# [1] 기본 설정 및 로그 (구글 시트 저장 기능 포함)
+# [1] 기본 설정 및 로그 (상세 로그 + 엑셀 저장 통합)
 # =========================================================
 import logging
 from datetime import datetime
@@ -25,49 +25,33 @@ import base64
 import pandas as pd
 import random
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 1. 구글 시트 연결 권한 얻기 (캐싱 적용)
+# 구글 시트 연결
 @st.cache_resource
 def get_google_sheet_connection():
     try:
-        # Secrets에 키가 있는지 확인
-        if "gcp_service_account" not in st.secrets: 
-            return None
-            
+        if "gcp_service_account" not in st.secrets: return None
         secrets = st.secrets["gcp_service_account"]
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(secrets, scope)
         client = gspread.authorize(creds)
         return client
-    except Exception as e:
-        print(f"Connection Error: {e}")
-        return None
+    except Exception: return None
 
-# 2. 실제로 시트에 저장하는 함수
+# 엑셀 저장 함수
 def save_log_to_sheet(log_data):
     try:
         client = get_google_sheet_connection()
         if client:
-            # 가이드님의 구글 스프레드시트 ID
             sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
             spreadsheet = client.open_by_key(sheet_id)
-            
-            # [수정 포인트] 가이드님이 만든 탭 이름 "Logs_ai"로 변경!
-            # 주의: 엑셀 하단 탭 이름이 정확히 Logs_ai 여야 합니다.
-            worksheet = spreadsheet.worksheet("Logs_ai")
-            
-            # 데이터 한 줄 추가
+            worksheet = spreadsheet.worksheet("Logs_ai") # 탭 이름 확인
             worksheet.append_row(log_data)
-            print(f"✅ 저장 성공: {log_data}") 
-    except Exception as e:
-        # 에러 나면 콘솔에만 출력 (앱 멈춤 방지)
-        print(f"❌ 저장 실패: {e}")
-        pass 
+    except Exception: pass 
 
-# 3. 앱 전체에서 사용할 로그 함수
+# [핵심] 로그 통합 함수 (화면 출력 + 엑셀 저장)
 def log_action(action, details=""):
     try:
         kst = pytz.timezone('Asia/Seoul') 
@@ -75,13 +59,14 @@ def log_action(action, details=""):
     except:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 사용자 ID 가져오기 (없으면 unknown)
     visitor_id = st.session_state.get('visitor_id', 'unknown')
     
-    # 콘솔에 출력 (확인용)
-    print(f"[{now}] {visitor_id} - {action}: {details}")
+    # 1. Manage App 화면(콘솔)에 상세 출력 (이전 버전 기능 부활)
+    log_msg = f"[{now}] ACTION: {action} | DETAILS: {details}"
+    print(log_msg)       
+    logger.info(log_msg) 
     
-    # [핵심] 구글 시트로 전송!
+    # 2. 엑셀에 저장
     save_log_to_sheet([now, visitor_id, action, details])
 
 # =========================================================
@@ -147,29 +132,34 @@ if 'survey_answers' not in st.session_state: st.session_state.survey_answers = {
 if 'swap_q1' not in st.session_state: st.session_state.swap_q1 = random.choice([True, False])
 if 'swap_q2' not in st.session_state: st.session_state.swap_q2 = random.choice([True, False])
 
-# --- 이동 함수 ---
+# --- 이동 함수 (상세 로그 포함) ---
 def go_page_recommendation(selected_type_val):
     st.session_state.previous_page = st.session_state.page 
     st.session_state.user_type = selected_type_val
     st.session_state.page = 'recommendation'
-    log_action("GO_REC", f"Type: {selected_type_val}")
+    # [로그] 결과 페이지 진입 기록
+    log_action("GO_RECOMMENDATION", f"Result Type: {selected_type_val}")
     st.rerun()
 
 def go_page_all_places():
     st.session_state.previous_page = st.session_state.page 
     st.session_state.page = 'all_places'
-    log_action("GO_ALL", "Viewed all places")
+    # [로그] 전체 보기 진입 기록
+    log_action("GO_ALL_PLACES", "Entered All Places View")
     st.rerun()
 
 def go_detail(row):
     st.session_state.previous_page = st.session_state.page
     st.session_state.current_place = row
     st.session_state.page = 'detail'
-    log_action("VIEW_DETAIL", f"Place: {row['Name_KR']}")
+    # [로그] 상세보기 클릭 (장소 이름 상세 기록)
+    place_name = f"{row['Name_KR']} ({row['Name_EN']})"
+    log_action("VIEW_DETAIL", f"Place: {place_name}")
 
 def go_back():
     st.session_state.page = st.session_state.previous_page
     st.session_state.current_place = None
+    log_action("NAV_BACK", "Clicked Back Button")
     st.rerun()
 
 def go_retake_survey():
@@ -179,8 +169,8 @@ def go_retake_survey():
     st.session_state.survey_answers = {'q1': None, 'q2': None}
     st.session_state.swap_q1 = random.choice([True, False])
     st.session_state.swap_q2 = random.choice([True, False])
+    log_action("RETAKE_SURVEY", "Restarted Survey")
     st.rerun()
-
 # =========================================================
 # [4] 텍스트 설정 & DB 매핑
 # =========================================================
@@ -302,27 +292,33 @@ if st.session_state.current_region not in txt['regions']:
     st.session_state.current_region = txt['regions'][0]
 
 # =========================================================
-# [PAGE 1] 설문조사
+# [PAGE 1] 설문조사 (버튼 클릭 상세 로그 추가)
 # =========================================================
 if st.session_state.page == 'survey':
     
     st.write(f"**{txt['region_label']}**")
-    st.session_state.current_region = st.radio(
+    new_region = st.radio(
         "Region_Survey", 
         txt['regions'], 
         index=txt['regions'].index(st.session_state.current_region), 
         horizontal=True, 
         label_visibility="collapsed"
     )
+    # 지역 변경 시 로그
+    if new_region != st.session_state.current_region:
+        log_action("SURVEY_REGION_CHANGE", f"Changed to {new_region}")
+        st.session_state.current_region = new_region
+
     st.divider()
 
-    # 1단계일 때만 퀵 필터 노출
+    # 1단계 퀵 필터
     if st.session_state.survey_step == 1:
         qc1, qc2, qc3, qc4 = st.columns(4)
-        if qc1.button(txt['btns'][0], use_container_width=True): go_page_recommendation(TYPE_MAPPING[txt['btns'][0]])
-        if qc2.button(txt['btns'][1], use_container_width=True): go_page_recommendation(TYPE_MAPPING[txt['btns'][1]])
-        if qc3.button(txt['btns'][2], use_container_width=True): go_page_recommendation(TYPE_MAPPING[txt['btns'][2]])
-        if qc4.button(txt['btns'][3], use_container_width=True): go_page_recommendation(TYPE_MAPPING[txt['btns'][3]])
+        for idx, btn_txt in enumerate(txt['btns']):
+            # 퀵 필터 클릭 로그
+            if eval(f"qc{idx+1}").button(btn_txt, use_container_width=True):
+                log_action("QUICK_FILTER_CLICK", f"Selected: {btn_txt}")
+                go_page_recommendation(TYPE_MAPPING[btn_txt])
         st.markdown("---")
 
     if "Kyoto" in st.session_state.current_region or "교토" in st.session_state.current_region:
@@ -342,17 +338,19 @@ if st.session_state.page == 'survey':
             current_title = txt['q2a_title']
 
     st.subheader(current_title)
-    # [수정] 서브타이틀(클릭하세요) 삭제됨
-
     IMG_HEIGHT = "250px"
 
-    # [수정] 버튼 렌더링 함수: 텍스트를 버튼 안으로 통합
+    # [수정] 로그 기능이 추가된 렌더링 함수
     def render_option(img_key, txt_key, val):
-        # 1. 이미지 표시
         st.markdown(get_local_image_html(get_img_path(img_key), height=IMG_HEIGHT), unsafe_allow_html=True)
-        # 2. 버튼 표시 (버튼 이름 = 설명 텍스트)
-        # 텍스트 설명(st.markdown)을 삭제하고, 버튼에 txt[txt_key]를 바로 넣었습니다.
+        
+        # 버튼 클릭
         if st.button(txt[txt_key], key=f"btn_{img_key}", use_container_width=True):
+            # [로그] 사용자의 선택 상세 기록
+            step_log = f"Step {st.session_state.survey_step}"
+            choice_log = f"Selected: {txt[txt_key]} ({val})"
+            log_action("SURVEY_CHOICE", f"{step_log} | {choice_log}")
+
             if st.session_state.survey_step == 1:
                 st.session_state.survey_answers['q1'] = val
                 st.session_state.survey_step = 2
@@ -375,6 +373,7 @@ if st.session_state.page == 'survey':
     # Step 2
     elif st.session_state.survey_step == 2:
         if st.button(f"⬅️ {txt['back']}"): 
+            log_action("SURVEY_BACK", "Went back to Step 1")
             st.session_state.survey_step = 1
             st.rerun()
             
@@ -382,19 +381,16 @@ if st.session_state.page == 'survey':
         
         if st.session_state.survey_answers['q1'] == 'landmark':
             opt_a = ("q2b_crowded", "q2b_crowded", "근랜드") 
-            opt_b = ("q2b_far", "q2b_far", "원랜드")         
-            if st.session_state.swap_q2: left, right = opt_b, opt_a
-            else: left, right = opt_a, opt_b
-            with col3: render_option(*left)
-            with col4: render_option(*right)
-
+            opt_b = ("q2b_far", "q2b_far", "원랜드")          
         elif st.session_state.survey_answers['q1'] == 'local':
             opt_a = ("q2a_adventure", "q2a_adventure", "모험") 
-            opt_b = ("q2a_quite", "q2a_quiet", "조용")         
-            if st.session_state.swap_q2: left, right = opt_b, opt_a
-            else: left, right = opt_a, opt_b
-            with col3: render_option(*left)
-            with col4: render_option(*right)
+            opt_b = ("q2a_quite", "q2a_quiet", "조용")          
+            
+        if st.session_state.swap_q2: left, right = opt_b, opt_a
+        else: left, right = opt_a, opt_b
+        
+        with col3: render_option(*left)
+        with col4: render_option(*right)
 
     st.divider()
     if st.button(txt['go_all'], type="secondary", use_container_width=True):
@@ -483,7 +479,7 @@ elif st.session_state.page == 'recommendation':
         go_retake_survey()
 
 # =========================================================
-# [PAGE 3] 전체 장소 리스트
+# [PAGE 3] 전체 장소 리스트 (필터 로그 상세 기록 복구)
 # =========================================================
 elif st.session_state.page == 'all_places':
     
@@ -516,11 +512,9 @@ elif st.session_state.page == 'all_places':
     st.markdown("---")
     
     st.write(f"**{txt['type_label']} (Filter)**")
-    
     selected_display_types = st.pills("Type", txt['btns'], selection_mode="multi", label_visibility="collapsed")
     
     st.write("")
-    
     st.write("🔎 **Category & Group Filter**")
     c1, c2 = st.columns(2)
     with c1:
@@ -530,9 +524,22 @@ elif st.session_state.page == 'all_places':
         st.write("👥 **Group**")
         sel_grps = st.pills("Grps", txt['grps'], selection_mode="multi", label_visibility="collapsed")
 
+    # ---------------------------------------------------------
+    # [핵심] 필터 변경 상세 로그 기록 (복구됨)
+    # ---------------------------------------------------------
+    current_filter_state = f"Region:{st.session_state.current_region} | Type:{selected_display_types} | Cats:{sel_cats} | Grps:{sel_grps}"
+    
+    if 'last_filter_state' not in st.session_state:
+        st.session_state.last_filter_state = ""
+        
+    if st.session_state.last_filter_state != current_filter_state:
+        # Manage App과 엑셀에 상세 필터 내용을 기록합니다.
+        log_action("FILTER_CHANGE", current_filter_state)
+        st.session_state.last_filter_state = current_filter_state
+    # ---------------------------------------------------------
+
     if selected_display_types:
         selected_db_values = [TYPE_MAPPING[disp] for disp in selected_display_types]
-        
         def filter_type(val):
             tags = [t.strip() for t in str(val).split(',')]
             for sel in selected_db_values:
@@ -669,41 +676,3 @@ elif st.session_state.page == 'detail':
                         if st.button("View", key=f"rec_{r_name_en}", use_container_width=True):
                             go_detail(r_row)
                             st.rerun()
-
-# =========================================================
-# [긴급] 사이드바 디버깅 패널 (들여쓰기 없이 맨 앞에 붙이세요!)
-# =========================================================
-with st.sidebar:
-    st.divider()
-    st.header("🔧 시스템 점검")
-    
-    if st.button("🚀 연결 테스트 (Click)", key="debug_btn"):
-        st.write("1. 시크릿 확인...")
-        if "gcp_service_account" in st.secrets:
-            st.success("✅ Secrets 있음")
-            
-            try:
-                # 구글 연결 시도
-                client = get_google_sheet_connection()
-                if client:
-                    st.success("✅ 구글 연결 성공")
-                    
-                    # 시트 열기
-                    sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
-                    spreadsheet = client.open_by_key(sheet_id)
-                    st.write(f"📄 파일: {spreadsheet.title}")
-                    
-                    # 탭 열기
-                    worksheet = spreadsheet.worksheet("Logs_ai")
-                    st.success("✅ 탭(Logs_ai) 찾음!")
-                    
-                    # 쓰기 테스트
-                    worksheet.append_row(["TEST", "Sidebar_Check", "성공", "Success"])
-                    st.success("🎉 저장 완료! 엑셀 확인하세요.")
-                    
-                else:
-                    st.error("❌ 연결 객체 없음(None)")
-            except Exception as e:
-                st.error(f"❌ 에러 발생: {e}")
-        else:
-            st.error("❌ Secrets 설정 안됨")
