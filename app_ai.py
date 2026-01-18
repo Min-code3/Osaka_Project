@@ -14,6 +14,17 @@ import random
 # =========================================================
 # [1] 기본 설정 및 로그
 # =========================================================
+import logging
+from datetime import datetime
+import pytz
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import streamlit as st
+import os
+import base64
+import pandas as pd
+import random
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -32,18 +43,19 @@ def save_log_to_sheet(log_data):
     try:
         client = get_google_sheet_connection()
         if client:
-            # 사용 중인 구글 시트 ID (그대로 유지)
+            # [중요] 같은 파일이므로 ID는 그대로 유지합니다.
             sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4" 
             spreadsheet = client.open_by_key(sheet_id)
             
-            # [수정 완료] "Logs" -> "Logs_ai" 탭으로 변경!
-            # 주의: 구글 스프레드시트에 "Logs_ai"라는 이름의 탭을 꼭 먼저 만들어두세요.
+            # [수정 포인트] 탭 이름을 "Logs_ai"로 변경!
+            # (구글 시트에 이 이름의 탭이 꼭 있어야 합니다)
             worksheet = spreadsheet.worksheet("Logs_ai")
             
             worksheet.append_row(log_data)
+            print(f"✅ 로그 저장 성공: {log_data}") # 배포 앱 로그창에서 확인용
     except Exception as e:
-        # 에러가 나면 콘솔에만 출력하고 앱은 안 멈추게 처리
-        print(f"Log Save Error: {e}")
+        # 에러가 나면 앱이 멈추지 않게 넘기되, 이유는 출력함
+        print(f"❌ 로그 저장 실패: {e}")
         pass 
 
 def log_action(action, details=""):
@@ -53,7 +65,6 @@ def log_action(action, details=""):
     except:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # 세션 ID가 없으면 unknown 처리
     visitor_id = st.session_state.get('visitor_id', 'unknown')
     
     # 구글 시트로 전송
