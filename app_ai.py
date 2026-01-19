@@ -609,13 +609,29 @@ elif st.session_state.page == 'detail':
             
         st.caption(f"⏱️ {time_ref} {row['Deep_Time']} min")
         
+        # [수정] 아래 줄들이 with col_left 안으로 들어오도록 들여쓰기 교정
         st.markdown("#### 📝 Description")
         st.write(row[cols['desc']])
         st.write("")
+        
+        # 태그 표시
         tags = str(row[cols['tag']]).split('#')
         st.info("   ".join([f"#{t.strip()}" for t in tags if t.strip()]))
-        if str(row.get(cols['map'], '')).startswith('http'): st.link_button("🗺️ Open Google Map", row[cols['map']], use_container_width=True)
-
+        
+        # [구글 맵] 버튼 방식 (로그 수집용)
+        map_url = str(row.get(cols['map'], ''))
+        
+        # URL이 있을 때만 버튼 표시
+        if map_url.startswith('http'):
+            # st.button을 사용해야 클릭 순간을 파이썬이 감지할 수 있음
+            if st.button("🗺️ Open Google Map", key="btn_google_map", use_container_width=True):
+                # 1. 로그 먼저 저장 (서버 통신)
+                log_action("CLICK_MAP", f"Place: {row['Name_KR']}")
+                
+                # 2. 자바스크립트로 새 창 띄우기
+                js_code = f"<script>window.open('{map_url}', '_blank');</script>"
+                components.html(js_code, height=0)
+                
     with col_right:
         st.subheader("🔭 Nearby Places")
         st.caption(f"Same Zone: {current_zone}")
