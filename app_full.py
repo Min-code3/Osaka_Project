@@ -102,7 +102,7 @@ if st.session_state.app_mode == "ai_bot":
     client = OpenAI(api_key=api_key)
 
     # 2. 화면 구성
-    st.title("🇯🇵 찐 가이드의 일본 여행 비서")
+    st.title("🇯🇵 일본 여행 비서")
 
     selected_region = st.radio(
         "여행 중인 지역을 선택해주세요",
@@ -183,7 +183,7 @@ if st.session_state.app_mode == "ai_bot":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    if prompt := st.chat_input("질문 입력 (예: 맛집 추천해줘)"):
+    if prompt := st.chat_input("질문 입력"):
         with st.chat_message("user"):
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
