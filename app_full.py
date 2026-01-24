@@ -258,7 +258,7 @@ elif st.session_state.app_mode == "place_rec":
         else:
             return f'<div style="width:100%; height:{height}; background-color:#f8f9fa; border-radius:{radius}; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#adb5bd; font-size:12px;"><span>No Image</span></div>'
 
-    @st.cache_data(ttl=600)
+    @st.cache_data(ttl=86400)
     def load_data():
         sheet_id = "1aEKUB0EBFApDKLVRd7cMbJ6vWlR7-yf62L5MHqMGvp4"
         sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
